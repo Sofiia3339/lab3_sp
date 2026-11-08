@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="uk">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Лабораторна 3 — AST</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#152438;font:16px system-ui,sans-serif}header{padding:28px 36px;background:#172b44;color:white}h1{font-size:26px;margin:0 0 8px}header p{margin:0;color:#c8d6e7}.tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:20px 36px;background:white;border-bottom:1px solid #d9e0e9}button{padding:8px 15px;background:#e6edf6;border:1px solid #c3d1e1;border-radius:6px;cursor:pointer}#status{padding:12px 36px;color:#41556c}#viewport{overflow:auto;height:72vh;padding:20px}svg{background:white;border-radius:12px;min-width:100%;min-height:100%}text{font:13px system-ui,sans-serif;pointer-events:none}.edge{fill:none;stroke:#a7b8cb;stroke-width:2}g.node{cursor:pointer}g.node:hover rect{stroke:#172b44;stroke-width:3}footer{padding:12px 36px;color:#52677f;font-size:14px}
+</style>
+<header><h1>Абстрактне синтаксичне дерево</h1><p>Підмножина C · Flex / Bison · Лабораторна робота №3</p></header>
+<div class="tools"><label>Файл AST: <input id="file" type="file" accept=".json"></label><button id="minus">−</button><button id="plus">+</button><button id="reset">100%</button><span id="scale">100%</span></div>
+<div id="status">Вибери файл .ast.json, створений аналізатором.</div>
+<div id="viewport"><svg id="tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Дерево AST"></svg></div>
+<footer>Натисни вузол, щоб переглянути його тип, значення та рядок. Велике дерево можна прокручувати й масштабувати.</footer>
+<script>
+const svg=document.getElementById('tree'),statusText=document.getElementById('status');
+const NS='http://www.w3.org/2000/svg';let current=null,zoom=1,width=800,height=400;
+function element(tag,attrs,text){const e=document.createElementNS(NS,tag);Object.entries(attrs||{}).forEach(([k,v])=>e.setAttribute(k,v));if(text!==undefined)e.textContent=text;return e;}
+function scale(){svg.setAttribute('width',width*zoom);svg.setAttribute('height',height*zoom);document.getElementById('scale').textContent=Math.round(zoom*100)+'%';}
+function draw(data){
+ svg.replaceChildren();let leaf=0,maxDepth=0,count=0;
+ function layout(n,depth){if(!n||typeof n.kind!=='string'||!Array.isArray(n.children))throw Error('Неправильна структура AST');if(depth>150)throw Error('Дерево надто глибоке');if(++count>5000)throw Error('Дерево надто велике');maxDepth=Math.max(maxDepth,depth);const children=n.children.map(c=>layout(c,depth+1));return{n,children,x:children.length?(children[0].x+children[children.length-1].x)/2:110+leaf++*195,y:55+depth*100};}
+ const root=layout(data,0);width=Math.max(800,leaf*195+30);height=Math.max(400,maxDepth*100+110);svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+ function edges(p){p.children.forEach(c=>{svg.append(element('path',{class:'edge',d:`M${p.x} ${p.y+23} C${p.x} ${p.y+55},${c.x} ${c.y-55},${c.x} ${c.y-23}`}));edges(c);});}
+ function nodes(p){const g=element('g',{class:'node',transform:`translate(${p.x},${p.y})`});const fill=['Declare','Assign'].includes(p.n.kind)?'#e5f3ed':['Binary','Unary'].includes(p.n.kind)?'#fff1d5':['If','While'].includes(p.n.kind)?'#eee8fc':'#e7effa';g.append(element('rect',{x:-88,y:-24,width:176,height:48,rx:8,fill,stroke:'#8da4bc'}));g.append(element('text',{'text-anchor':'middle',y:-3},p.n.kind));const value=p.n.text||`рядок ${p.n.line}`;g.append(element('text',{'text-anchor':'middle',y:15},value.length>20?value.slice(0,19)+'…':value));g.append(element('title',{},`${p.n.kind}: ${p.n.text}; рядок ${p.n.line}`));g.addEventListener('click',()=>statusText.textContent=`Тип: ${p.n.kind} | Значення: ${p.n.text||'—'} | Рядок: ${p.n.line}`);svg.append(g);p.children.forEach(nodes);}
+ edges(root);nodes(root);statusText.textContent=`Вузлів: ${count}. Файл завантажено.`;scale();
+}
+document.getElementById('file').addEventListener('change',async e=>{try{const file=e.target.files[0];if(!file)return;current=JSON.parse(await file.text());zoom=1;draw(current);}catch(error){svg.replaceChildren();statusText.textContent='Помилка: '+error.message;}});
+document.getElementById('plus').onclick=()=>{zoom=Math.min(3,zoom+.2);scale();};
+document.getElementById('minus').onclick=()=>{zoom=Math.max(.2,zoom-.2);scale();};
+document.getElementById('reset').onclick=()=>{zoom=1;scale();};
+</script>
+</html>
